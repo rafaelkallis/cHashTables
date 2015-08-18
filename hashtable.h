@@ -20,8 +20,6 @@
 
 #define hashtable_MAX_LOAD_FACTOR 0.5
 
-#define fractional_part(whole) ((whole - (long)whole))
-
 #define hashtable_insufficient_memory_error()   \
     do{                                         \
      fprintf(stderr,"Insufficient memory.\n");  \
@@ -32,7 +30,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
-#include "murmur3.h"
 
 /* Specify your hash data type here */
 
@@ -40,7 +37,11 @@
 
     typedef uint32_t key_type;
 
+    #define MACHINE_WORD_SIZE 32
+
 /*                                  */
+
+static uint8_t srand_check = 0;
 
 struct hashtable_bucket_chaining{
     void * data;
@@ -48,7 +49,8 @@ struct hashtable_bucket_chaining{
 };
 
 struct hashtable_chaining{
-    hash_type items,buckets;
+    hash_type items,buckets,seed;
+    uint8_t bucket_power;
     struct hashtable_bucket_chaining ** table;
     key_type * (*get_key)(void* data);
 };
@@ -67,20 +69,21 @@ static inline struct hashtable_bucket_chaining * hashtable_new_bucket_chaining(d
     return new_bucket_chaining;
 }
 
-/* Multiplicative hash using Knuth's famous 1/GoldenRatio Constant */
-/*          h(x) = m * fractional_part(x * 0.618) */
-static inline hash_type hashtable_hash(buckets, key)
-    hash_type buckets;
+static inline hash_type hashtable_hash(key, seed, cap_order)
+    uint8_t cap_order;
     key_type * key;
+    hash_type seed;
+
 {
-    double fraction = 0.6180339887498948482 * *key;
-    return (hash_type)(buckets * (fraction - (long)fraction));
+    return ( (2*seed-1) * *key + seed ) >> (MACHINE_WORD_SIZE - cap_order);
 }
 
 struct hashtable_chaining * hashtable_Init(get_key, init_size)
     key_type * (*get_key)(void*);
     hash_type init_size;
 {
+    if(!srand_check)srand(time(0)),srand_check = rand();
+
     struct hashtable_chaining * new_hashtable;
     
     if((new_hashtable = (struct hashtable_chaining*) malloc(sizeof(hashtable))) == NULL)
@@ -88,10 +91,11 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
         
 #warning maybe replaceable with rehash()
     new_hashtable->items        = 0;
-    new_hashtable->buckets      = init_size;
     new_hashtable->get_key      = get_key;
+    new_hashtable->seed         = rand();
+    new_hashtable->bucket_power = (uint8_t)ceil(log2(init_size < 2 ? 2 : init_size));
         
-    if ((new_hashtable->table   = (struct hashtable_bucket_chaining **)malloc(sizeof(struct hashtable_bucket_chaining) * init_size)) == NULL)
+    if ((new_hashtable->table   = (struct hashtable_bucket_chaining **)malloc(sizeof(struct hashtable_bucket_chaining) * pow(2, new_hashtable->bucket_power))) == NULL)
         hashtable_insufficient_memory_error();
         
     return new_hashtable;
@@ -103,7 +107,7 @@ void hashtable_Insert(_hashtable, data)
 {
 #warning check for loadfactor
 #warning dynamic resize maybe
-    hash_type hash = hashtable_hash(_hashtable->buckets, _hashtable->get_key(data)); /*hashtable_hash_f(_hashtable->buckets, *(double*)data);*/
+    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_power);
     _hashtable->table[hash] = hashtable_new_bucket_chaining(data, _hashtable->table[hash]);
 }
 
@@ -112,7 +116,7 @@ void * hashtable_Query(_hashtable, data, compar)
     void * data;
     int (*compar)(void*,void*);
 {
-    hash_type hash = hashtable_hash(_hashtable->buckets, data);
+    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_power);
     struct hashtable_bucket_chaining * iterator = _hashtable->table[hash];
     
     while(iterator){
@@ -129,7 +133,7 @@ void hashtable_Delete(_hashtable, data, compar, destroy)
     int (*compar)(void*,void*);
     void (*destroy)(void* data);
 {
-    hash_type hash = hashtable_hash(_hashtable->buckets, data);
+    hash_type hash = hashtable_hash(_hashtable->get_key( data),_hashtable->seed, _hashtable->bucket_power);
     struct hashtable_bucket_chaining * temp = _hashtable->table[hash], * prev = NULL;
     
     while(temp){
