@@ -20,6 +20,8 @@
 
 #define hashtable_MAX_LOAD_FACTOR 0.5
 
+#define hashtable_constant (0.6180339887*(1 << MACHINE_WORD_SIZE))
+
 #define hashtable_insufficient_memory_error()   \
     do{                                         \
      fprintf(stderr,"Insufficient memory.\n");  \
@@ -69,13 +71,13 @@ static inline struct hashtable_bucket_chaining * hashtable_new_bucket_chaining(d
     return new_bucket_chaining;
 }
 
-static inline hash_type hashtable_hash(key, seed, cap_order)
+static inline hash_type hashtable_hash(key,seed, cap_order)
     uint8_t cap_order;
     key_type * key;
-    hash_type seed;
+hash_type seed;
 
 {
-    return ( (2*seed-1) * *key + seed ) >> (MACHINE_WORD_SIZE - cap_order);
+    return ((hash_type)( (seed * *key ))) >> (MACHINE_WORD_SIZE - cap_order);
 }
 
 struct hashtable_chaining * hashtable_Init(get_key, init_size)
@@ -92,10 +94,10 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
 #warning maybe replaceable with rehash()
     new_hashtable->items        = 0;
     new_hashtable->get_key      = get_key;
-    new_hashtable->seed         = rand();
     new_hashtable->bucket_power = (uint8_t)ceil(log2(init_size < 2 ? 2 : init_size));
-        
-    if ((new_hashtable->table   = (struct hashtable_bucket_chaining **)malloc(sizeof(struct hashtable_bucket_chaining) * pow(2, new_hashtable->bucket_power))) == NULL)
+    new_hashtable->seed     = (hash_type)rand()/* % (1<<(MACHINE_WORD_SIZE-new_hashtable->bucket_power))*/;
+
+    if ((new_hashtable->table   = (struct hashtable_bucket_chaining **)malloc(sizeof(struct hashtable_bucket_chaining) * (1<<new_hashtable->bucket_power))) == NULL)
         hashtable_insufficient_memory_error();
         
     return new_hashtable;
@@ -109,6 +111,7 @@ void hashtable_Insert(_hashtable, data)
 #warning dynamic resize maybe
     hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_power);
     _hashtable->table[hash] = hashtable_new_bucket_chaining(data, _hashtable->table[hash]);
+    _hashtable->items++;
 }
 
 void * hashtable_Query(_hashtable, data, compar)
