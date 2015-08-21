@@ -18,10 +18,6 @@
 #ifndef HASHTABLE_H
 #define HASHTABLE_H
 
-#define hashtable_MAX_LOAD_FACTOR 0.5
-
-#define hashtable_constant (0.6180339887*(1 << MACHINE_WORD_SIZE))
-
 #define hashtable_insufficient_memory_error()   \
     do{                                         \
      fprintf(stderr,"Insufficient memory.\n");  \
@@ -51,8 +47,8 @@ struct hashtable_bucket_chaining{
 };
 
 struct hashtable_chaining{
-    hash_type items,buckets,seed;
-    uint8_t bucket_power;
+    hash_type items,seed;
+    uint8_t bucket_size_exponent;
     struct hashtable_bucket_chaining ** table;
     key_type * (*get_key)(void* data);
 };
@@ -77,7 +73,7 @@ static inline hash_type hashtable_hash(key,seed, cap_order)
 hash_type seed;
 
 {
-    return ((hash_type)( (seed * *key ))) >> (MACHINE_WORD_SIZE - cap_order);
+    return ((hash_type)( (hash_type)(seed * *key))) >> (MACHINE_WORD_SIZE - cap_order);
 }
 
 struct hashtable_chaining * hashtable_Init(get_key, init_size)
@@ -94,10 +90,10 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
 #warning maybe replaceable with rehash()
     new_hashtable->items        = 0;
     new_hashtable->get_key      = get_key;
-    new_hashtable->bucket_power = (uint8_t)ceil(log2(init_size < 2 ? 2 : init_size));
-    new_hashtable->seed     = (hash_type)rand()/* % (1<<(MACHINE_WORD_SIZE-new_hashtable->bucket_power))*/;
+    new_hashtable->bucket_size_exponent = (uint8_t)ceil(log2(init_size < 2 ? 2 : init_size));
+    new_hashtable->seed     = (hash_type)rand();
 
-    if ((new_hashtable->table   = (struct hashtable_bucket_chaining **)malloc(sizeof(struct hashtable_bucket_chaining) * (1<<new_hashtable->bucket_power))) == NULL)
+    if ((new_hashtable->table   = (struct hashtable_bucket_chaining **)malloc(sizeof(struct hashtable_bucket_chaining) * (1<<new_hashtable->bucket_size_exponent))) == NULL)
         hashtable_insufficient_memory_error();
         
     return new_hashtable;
@@ -109,7 +105,7 @@ void hashtable_Insert(_hashtable, data)
 {
 #warning check for loadfactor
 #warning dynamic resize maybe
-    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_power);
+    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_size_exponent);
     _hashtable->table[hash] = hashtable_new_bucket_chaining(data, _hashtable->table[hash]);
     _hashtable->items++;
 }
@@ -119,7 +115,7 @@ void * hashtable_Query(_hashtable, data, compar)
     void * data;
     int (*compar)(void*,void*);
 {
-    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_power);
+    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_size_exponent);
     struct hashtable_bucket_chaining * iterator = _hashtable->table[hash];
     
     while(iterator){
@@ -136,7 +132,7 @@ void hashtable_Delete(_hashtable, data, compar, destroy)
     int (*compar)(void*,void*);
     void (*destroy)(void* data);
 {
-    hash_type hash = hashtable_hash(_hashtable->get_key( data),_hashtable->seed, _hashtable->bucket_power);
+    hash_type hash = hashtable_hash(_hashtable->get_key( data),_hashtable->seed, _hashtable->bucket_size_exponent);
     struct hashtable_bucket_chaining * temp = _hashtable->table[hash], * prev = NULL;
     
     while(temp){
@@ -151,6 +147,52 @@ void hashtable_Delete(_hashtable, data, compar, destroy)
         destroy(temp->data);
         free(temp);
     }
+}
+
+static double hashtable_Get_Occupied_Percentage(_hashtable)
+struct hashtable_chaining * _hashtable;
+{
+    hash_type occupied,i;
+    for(occupied = 0, i = 0; i < 1<<_hashtable->bucket_size_exponent; i++)
+        if(_hashtable->table[i]) occupied++;
+    return 100*(double)occupied/(1<<_hashtable->bucket_size_exponent);
+}
+
+static unsigned int hashtable_Get_Biggest_Chain(_hashtable)
+struct hashtable_chaining * _hashtable;
+{
+    hash_type max_global,max_chain,i;
+    struct hashtable_bucket_chaining * temp;
+    for(i = 0, max_global=0; i < 1<<_hashtable->bucket_size_exponent; i++){
+        for(temp = _hashtable->table[i], max_chain=0; temp; temp=temp->next)
+            max_chain++;
+        max_global = max_chain > max_global ? max_chain : max_global;
+    }
+    return max_global;
+}
+
+static inline double hashtable_Get_Loadfactor(_hashtable)
+struct hashtable_chaining * _hashtable;
+{
+    return (double)_hashtable->items/(1<<_hashtable->bucket_size_exponent);
+}
+
+void hashtable_Stats(_hashtable)
+    struct hashtable_chaining * _hashtable;
+{
+    
+    double occupiedP = hashtable_Get_Occupied_Percentage(_hashtable);
+    printf(" * Hashtable Statistics *\n");
+    printf("——————————————————————————\n");
+    printf("Seed         = %d \n",_hashtable->seed);
+    printf("#Items       = %u \n",(uint32_t)_hashtable->items);
+    printf("#Buckets     = %u \n",(uint32_t)1<<_hashtable->bucket_size_exponent);
+    printf("BiggestChain = %d \n",hashtable_Get_Biggest_Chain(_hashtable));
+    printf("%%Occupied    = %0.2f%% \n",occupiedP);
+    printf("%%Empty       = %0.2f%% \n",100-occupiedP);
+    printf("LoadFactor   = %0.2f\n",hashtable_Get_Loadfactor(_hashtable));
+    printf("——————————————————————————\n");
+
 }
 
 #endif
