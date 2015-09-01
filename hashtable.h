@@ -87,7 +87,6 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
     if((new_hashtable = (struct hashtable_chaining*) malloc(sizeof(hashtable))) == NULL)
         hashtable_insufficient_memory_error();
         
-#warning maybe replaceable with rehash()
     new_hashtable->items        = 0;
     new_hashtable->get_key      = get_key;
     new_hashtable->bucket_size_exponent = (uint8_t)ceil(log2(init_size < 2 ? 2 : init_size));
@@ -193,6 +192,24 @@ void hashtable_Stats(_hashtable)
     printf("LoadFactor   = %0.2f\n",hashtable_Get_Loadfactor(_hashtable));
     printf("——————————————————————————\n");
 
+}
+
+void hashtable_Print(_hashtable)
+struct hashtable_chaining * _hashtable;
+{
+    hash_type i;
+    struct hashtable_bucket_chaining * temp;
+    
+    printf(" * Hashtable Content *\n");
+    printf("——————————————————————————");
+
+    for(i=0;i<1<<_hashtable->bucket_size_exponent;i++){
+        printf("\n%d:",i);
+        for(temp=_hashtable->table[i];temp;temp=temp->next){
+            printf("->(%d)",*_hashtable->get_key(temp));
+        }
+    }
+    printf("\n——————————————————————————\n");
 }
 
 #endif
