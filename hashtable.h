@@ -212,4 +212,25 @@ struct hashtable_chaining * _hashtable;
     printf("\n——————————————————————————\n");
 }
 
+//TODO: Check Correctness
+static void hashtable_Rehash(_hashtable, old_size_exponent, new_size_exponent)
+struct hashtable_chaining * _hashtable;
+uint8_t old_size_exponent;
+uint8_t new_size_exponent;
+{
+    hash_type i,hash;
+    struct hashtable_bucket_chaining * temp;
+    
+    for(i=0;i<1<<old_size_exponent;i++){
+        for(temp = _hashtable->table[i];
+            temp;
+            temp = temp==_hashtable->table[i]?temp->next:_hashtable->table[i])
+        {
+            _hashtable->table[i]=temp->next;
+            hash=hashtable_hash(_hashtable->get_key(temp), _hashtable->seed, new_size_exponent);
+            temp->next = _hashtable->table[hash];
+            _hashtable->table[hash] = temp;
+        }
+    }
+}
 #endif
