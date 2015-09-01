@@ -257,4 +257,19 @@ struct hashtable_chaining * _hashtable;
     }
      */
 }
+
+static void hashtable_Collapse(_hashtable)
+struct hashtable_chaining * _hashtable;
+{
+    struct hashtable_bucket_chaining **safe;
+    
+    _hashtable->bucket_size_exponent--;
+    _hashtable->seed = (hash_type)rand(); /* Optional */
+    hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent+1, _hashtable->bucket_size_exponent);
+    if((safe =
+        (struct hashtable_bucket_chaining**)realloc(_hashtable->table,
+                                                    sizeof(struct hashtable_bucket_chaining*) * (1<<_hashtable-> bucket_size_exponent)))== NULL) hashtable_insufficient_memory_error();
+    _hashtable->table = safe;
+}
+
 #endif
