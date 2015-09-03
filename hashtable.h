@@ -271,8 +271,8 @@ struct hashtable_chaining * _hashtable;
     _hashtable->seed = (hash_type)rand(); /* Optional */
     hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent+1, _hashtable->bucket_size_exponent);
     if((safe =
-        (struct hashtable_bucket_chaining**)realloc(_hashtable->table,
-                                                    sizeof(struct hashtable_bucket_chaining*) * (1<<_hashtable-> bucket_size_exponent)))== NULL) hashtable_insufficient_memory_error();
+        (struct hashtable_bucket_chaining**)hashtable_realloc_zero(_hashtable->table,sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent+1)),
+                                                                   sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent)))== NULL) hashtable_insufficient_memory_error();
     _hashtable->table = safe;
 }
 
