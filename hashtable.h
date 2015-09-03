@@ -292,8 +292,15 @@ struct hashtable_chaining * _hashtable;
     printf("\n———————————————————————\n");
 }
 
+void hashtable_Optimize(_hashtable)
 struct hashtable_chaining * _hashtable;
 {
+    //TODO: find tolerance-function for while loop
+    double nBuckets = 1<<_hashtable->bucket_size_exponent;
+    double occupiedP = hashtable_Get_Occupied_Percentage(_hashtable);
+    while(occupiedP - pow(1-(1/nBuckets), _hashtable->items) > 0){
+        _hashtable->seed = rand();
+        hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent, _hashtable->bucket_size_exponent);
     }
         
 }
