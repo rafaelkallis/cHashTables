@@ -251,25 +251,15 @@ size_t newSize;
 /*static*/ void hashtable_Expand(_hashtable)
 struct hashtable_chaining * _hashtable;
 {
-    struct hashtable_bucket_chaining **safe/*, *temp*/;
-    /*hash_type i,hash;*/
-
+    struct hashtable_bucket_chaining **safe;
+    
     _hashtable->bucket_size_exponent++;
     _hashtable->seed = (hash_type)rand(); /* Optional */
     if((safe =
-        (struct hashtable_bucket_chaining**)realloc(_hashtable->table,
+        (struct hashtable_bucket_chaining**)hashtable_realloc_zero(_hashtable->table,sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent-1)),
                                                     sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent)))== NULL) hashtable_insufficient_memory_error();
     _hashtable->table = safe;
     hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent-1, _hashtable->bucket_size_exponent);
-    /*for(i=0;i<1<<(_hashtable->bucket_size_exponent-1);i++){
-        for(temp = _hashtable->table[i];temp;temp = temp==_hashtable->table[i]?temp->next:_hashtable->table[i]){
-            _hashtable->table[i]=temp->next;
-            hash=hashtable_hash(_hashtable->get_key(temp), _hashtable->seed, _hashtable->bucket_size_exponent);
-            temp->next = _hashtable->table[hash];
-            _hashtable->table[hash] = temp;
-        }
-    }
-     */
 }
 
 static void hashtable_Collapse(_hashtable)
