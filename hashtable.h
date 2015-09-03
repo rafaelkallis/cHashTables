@@ -84,7 +84,7 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
 
     struct hashtable_chaining * new_hashtable;
     
-    if((new_hashtable = (struct hashtable_chaining*) malloc(sizeof(hashtable))) == NULL)
+    if((new_hashtable = (struct hashtable_chaining*) malloc(sizeof(struct hashtable_chaining))) == NULL)
         hashtable_insufficient_memory_error();
         
     new_hashtable->items        = 0;
@@ -92,7 +92,9 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
     new_hashtable->bucket_size_exponent = (uint8_t)ceil(log2(init_size < 2 ? 2 : init_size));
     new_hashtable->seed     = (hash_type)rand();
 
-    if ((new_hashtable->table   = (struct hashtable_bucket_chaining **)malloc(sizeof(struct hashtable_bucket_chaining) * (1<<new_hashtable->bucket_size_exponent))) == NULL)
+   
+        
+    if ((new_hashtable->table=(struct hashtable_bucket_chaining **)calloc(1<<new_hashtable->bucket_size_exponent,sizeof(struct hashtable_bucket_chaining*))) == NULL)
         hashtable_insufficient_memory_error();
         
     return new_hashtable;
