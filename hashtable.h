@@ -102,8 +102,7 @@ void hashtable_Insert(_hashtable, data)
     struct hashtable_chaining * _hashtable;
     void * data;
 {
-#warning check for loadfactor
-#warning dynamic resize maybe
+//TODO: Add check & expand load factor
     hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_size_exponent);
     _hashtable->table[hash] = hashtable_new_bucket_chaining(data, _hashtable->table[hash]);
     _hashtable->items++;
@@ -201,7 +200,7 @@ struct hashtable_chaining * _hashtable;
     struct hashtable_bucket_chaining * temp;
     
     printf(" * Hashtable Content *\n");
-    printf("——————————————————————————");
+    printf("———————————————————————");
 
     for(i=0;i<1<<_hashtable->bucket_size_exponent;i++){
         printf("\n%d:",i);
@@ -209,10 +208,9 @@ struct hashtable_chaining * _hashtable;
             printf("->(%d)",*_hashtable->get_key(temp));
         }
     }
-    printf("\n——————————————————————————\n");
+    printf("\n———————————————————————\n");
 }
 
-//TODO: Check Correctness
 static void hashtable_Rehash(_hashtable, old_size_exponent, new_size_exponent)
 struct hashtable_chaining * _hashtable;
 uint8_t old_size_exponent;
@@ -232,6 +230,20 @@ uint8_t new_size_exponent;
             _hashtable->table[hash] = temp;
         }
     }
+}
+
+static void* hashtable_realloc_zero(pBuffer, oldSize, newSize)
+void * pBuffer;
+size_t oldSize;
+size_t newSize;
+{
+    void* pNew = realloc(pBuffer, newSize);
+    if ( newSize > oldSize && pNew ) {
+        size_t diff = newSize - oldSize;
+        void* pStart = ((char*)pNew) + oldSize;
+        memset(pStart, 0, diff);
+    }
+    return pNew;
 }
 
 /*static*/ void hashtable_Expand(_hashtable)
