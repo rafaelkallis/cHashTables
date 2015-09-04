@@ -174,25 +174,25 @@ struct hashtable_chaining * _hashtable;
     if((safe =
         (struct hashtable_bucket_chaining**)hashtable_realloc_zero(_hashtable->table,sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent-1)),
                                                                    sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent)))== NULL) hashtable_insufficient_memory_error();
-        _hashtable->table = safe;
-        hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent-1, _hashtable->bucket_size_exponent);
-        }
-
-static void hashtable_Collapse(_hashtable)
-    struct hashtable_chaining * _hashtable;
-{
-    struct hashtable_bucket_chaining **safe;
-    
-    _hashtable->bucket_size_exponent--;
-    hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent+1, _hashtable->bucket_size_exponent);
-    if((safe =
-        (struct hashtable_bucket_chaining**)hashtable_realloc_zero
-        (_hashtable->table,
-         sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent+1)),
-         sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent))
-        )== NULL) hashtable_insufficient_memory_error();
     _hashtable->table = safe;
+    hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent-1, _hashtable->bucket_size_exponent);
 }
+
+//static void hashtable_Collapse(_hashtable)
+//    struct hashtable_chaining * _hashtable;
+//{
+//    struct hashtable_bucket_chaining **safe;
+//    
+//    _hashtable->bucket_size_exponent--;
+//    hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent+1, _hashtable->bucket_size_exponent);
+//    if((safe =
+//        (struct hashtable_bucket_chaining**)hashtable_realloc_zero
+//        (_hashtable->table,
+//         sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent+1)),
+//         sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent))
+//        )== NULL) hashtable_insufficient_memory_error();
+//    _hashtable->table = safe;
+//}
 void hashtable_Insert(_hashtable, data)
     struct hashtable_chaining * _hashtable;
     void * data;
@@ -202,47 +202,46 @@ void hashtable_Insert(_hashtable, data)
     hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_size_exponent);
     _hashtable->table[hash] = hashtable_new_bucket_chaining(data, _hashtable->table[hash]);
     _hashtable->items++;
-    //printf("%d\n",hash);
 }
 
 void * hashtable_Query(_hashtable, data, compar)
     struct hashtable_chaining * _hashtable;
     void * data;
-    int (*compar)(void*,void*);
+    int (*compar)(const void*, const void*);
 {
     hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_size_exponent);
-    struct hashtable_bucket_chaining * iterator = _hashtable->table[hash];
+    struct hashtable_bucket_chaining * temp = _hashtable->table[hash];
     
-    while(iterator){
-        if(compar(iterator->data, data) == 0 ) return iterator;
-        else iterator = iterator->next;
+    while(temp){
+        if(compar(temp->data, data) == 0 ) return temp->data;
+        else temp = temp->next;
     }
     
     return NULL;
 }
 
-void hashtable_Delete(_hashtable, data, compar, destroy)
-    struct hashtable_chaining * _hashtable;
-    void * data;
-    int (*compar)(void*,void*);
-    void (*destroy)(void* data);
-{
-    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed, _hashtable->bucket_size_exponent);
-    struct hashtable_bucket_chaining * temp = _hashtable->table[hash], * prev = NULL;
-    
-    while(temp){
-        if(compar(temp->data,data)==0)break;
-        else prev = temp, temp = temp->next;
-    }
-    
-    if (temp){
-        if (prev) prev ->next = temp->next;
-        else _hashtable->table[hash] = temp->next;
-                
-        destroy(temp->data);
-        free(temp);
-    }
-}
+//void hashtable_Delete(_hashtable, data, compar, destroy)
+//    struct hashtable_chaining * _hashtable;
+//    void * data;
+//    int (*compar)(void*,void*);
+//    void (*destroy)(void* data);
+//{
+//    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed, _hashtable->bucket_size_exponent);
+//    struct hashtable_bucket_chaining * temp = _hashtable->table[hash], * prev = NULL;
+//    
+//    while(temp){
+//        if(compar(temp->data,data)==0)break;
+//        else prev = temp, temp = temp->next;
+//    }
+//    
+//    if (temp){
+//        if (prev) prev ->next = temp->next;
+//        else _hashtable->table[hash] = temp->next;
+//                
+//        destroy(temp->data);
+//        free(temp);
+//    }
+//}
 
 static double hashtable_Get_Occupied_Ratio(_hashtable)
 struct hashtable_chaining * _hashtable;
