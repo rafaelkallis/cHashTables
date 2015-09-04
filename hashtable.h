@@ -220,28 +220,27 @@ void * hashtable_Query(_hashtable, data, compar)
     return NULL;
 }
 
-//void hashtable_Delete(_hashtable, data, compar, destroy)
-//    struct hashtable_chaining * _hashtable;
-//    void * data;
-//    int (*compar)(void*,void*);
-//    void (*destroy)(void* data);
-//{
-//    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed, _hashtable->bucket_size_exponent);
-//    struct hashtable_bucket_chaining * temp = _hashtable->table[hash], * prev = NULL;
-//    
-//    while(temp){
-//        if(compar(temp->data,data)==0)break;
-//        else prev = temp, temp = temp->next;
-//    }
-//    
-//    if (temp){
-//        if (prev) prev ->next = temp->next;
-//        else _hashtable->table[hash] = temp->next;
-//                
-//        destroy(temp->data);
-//        free(temp);
-//    }
-//}
+void hashtable_Delete(_hashtable, data, compar, destroy)
+    struct hashtable_chaining * _hashtable;
+    void * data;
+    int (*compar)(const void*, const void*);
+    void (*destroy)(void* data);
+{
+    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed, _hashtable->bucket_size_exponent);
+    struct hashtable_bucket_chaining * temp = _hashtable->table[hash], * prev = NULL;
+    
+    while(temp){
+        if(!compar(temp->data,data))break;
+        else prev = temp, temp = temp->next;
+    }
+    if (temp){
+        if (prev) prev->next = temp->next;
+        else _hashtable->table[hash] = temp->next;
+                
+        destroy(temp->data);
+        free(temp);
+    }
+}
 
 static double hashtable_Get_Occupied_Ratio(_hashtable)
 struct hashtable_chaining * _hashtable;
@@ -249,7 +248,7 @@ struct hashtable_chaining * _hashtable;
     hash_type occupied,i;
     for(occupied = 0, i = 0; i < 1<<_hashtable->bucket_size_exponent; i++)
         if(_hashtable->table[i]) occupied++;
-    return /*100**/(double)occupied/(1<<_hashtable->bucket_size_exponent);
+    return (double)occupied/(1<<_hashtable->bucket_size_exponent);
 }
 
 static unsigned int hashtable_Get_Biggest_Chain(_hashtable)
