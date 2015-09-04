@@ -244,13 +244,13 @@ void hashtable_Delete(_hashtable, data, compar, destroy)
     }
 }
 
-static double hashtable_Get_Occupied_Percentage(_hashtable)
+static double hashtable_Get_Occupied_Ratio(_hashtable)
 struct hashtable_chaining * _hashtable;
 {
     hash_type occupied,i;
     for(occupied = 0, i = 0; i < 1<<_hashtable->bucket_size_exponent; i++)
         if(_hashtable->table[i]) occupied++;
-    return 100*(double)occupied/(1<<_hashtable->bucket_size_exponent);
+    return /*100**/(double)occupied/(1<<_hashtable->bucket_size_exponent);
 }
 
 static unsigned int hashtable_Get_Biggest_Chain(_hashtable)
@@ -276,16 +276,16 @@ void hashtable_Stats(_hashtable)
     struct hashtable_chaining * _hashtable;
 {
     double nBuckets = 1<<_hashtable->bucket_size_exponent;
-    double occupiedP = hashtable_Get_Occupied_Percentage(_hashtable);
+    double occupiedR = hashtable_Get_Occupied_Ratio(_hashtable);
     printf(" * Hashtable Statistics *\n");
     printf("——————————————————————————\n");
     printf("Seed         = %d \n",_hashtable->seed);
     printf("#Items       = %u \n",(uint32_t)_hashtable->items);
     printf("#Buckets     = %u \n",(uint32_t)nBuckets);
     printf("BiggestChain = %d \n",hashtable_Get_Biggest_Chain(_hashtable));
-    printf("%%Occupied    = %0.2f%% \n",occupiedP);
-    printf("%%Empty       = %0.2f%% ",100-occupiedP);
-    printf("(Expected: %0.2f%%, Diff = %+0.2f%%)\n",100*pow(1-1/nBuckets, _hashtable->items),(100-occupiedP)-100*pow(1-1/nBuckets, _hashtable->items));
+    printf("%%Occupied    = %0.2f%% \n",100*occupiedR);
+    printf("%%Empty       = %0.2f%% ",100*(1-occupiedR));
+    printf("(Expected: %0.2f%%, Diff = %+0.2f%%)\n",100*pow(1-1/nBuckets, _hashtable->items),100*(1-occupiedR)-100*pow(1-1/nBuckets, _hashtable->items));
     printf("LoadFactor   = %0.2f\n",hashtable_Get_Loadfactor(_hashtable));
     printf("——————————————————————————\n");
 
@@ -312,14 +312,8 @@ struct hashtable_chaining * _hashtable;
 void hashtable_Optimize(_hashtable)
 struct hashtable_chaining * _hashtable;
 {
-    //TODO: find tolerance-function for while loop
     double nBuckets = 1<<_hashtable->bucket_size_exponent;
-    double occupiedP = hashtable_Get_Occupied_Percentage(_hashtable);
-    while(occupiedP - pow(1-(1/nBuckets), _hashtable->items) > 0){
-        _hashtable->seed = rand();
-        hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent, _hashtable->bucket_size_exponent);
-    }
-        
+    while((1-hashtable_Get_Occupied_Ratio(_hashtable))-pow(1-1/nBuckets, _hashtable->items) > 0) hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent, _hashtable->bucket_size_exponent);
 }
 
 #endif
