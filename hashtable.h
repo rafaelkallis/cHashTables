@@ -102,9 +102,7 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
     new_hashtable->get_key      = get_key;
     new_hashtable->bucket_size_exponent = (uint8_t)ceil(log2(init_size < 2 ? 2 : init_size));
     new_hashtable->seed     = (hash_type)rand();
-
    
-        
     if ((new_hashtable->table=(struct hashtable_bucket_chaining **)calloc(1<<new_hashtable->bucket_size_exponent,sizeof(struct hashtable_bucket_chaining*))) == NULL)
         hashtable_insufficient_memory_error();
         
@@ -117,17 +115,39 @@ uint8_t old_size_exponent;
 uint8_t new_size_exponent;
 {
     hash_type i,hash;
-    struct hashtable_bucket_chaining * temp;
-    
+    struct hashtable_bucket_chaining *temp,*prev;
+    _hashtable->seed = (hash_type)rand(); /* Optional */
     for(i=0;i<1<<old_size_exponent;i++){
-        for(temp = _hashtable->table[i];
+//        temp = _hashtable->table[i];
+//        prev = NULL;
+//        while(temp){
+//            hash=hashtable_hash(_hashtable->get_key(temp->data), _hashtable->seed, new_size_exponent);
+//            if(i==hash){
+//                prev=temp;
+//                temp=temp->next;
+//            }else{
+//                if(prev) prev->next = temp->next;
+//                else _hashtable->table[i]=temp->next;
+//                temp->next = _hashtable->table[hash];
+//                _hashtable->table[hash]=temp;
+//                
+//                prev=NULL;
+//                temp=_hashtable->table[i]; //Resets to position prior to insertion to new bucket
+//                
+//            }
+//        }
+        for(temp = _hashtable->table[i], prev=NULL;
             temp;
-            temp = temp==_hashtable->table[i]?temp->next:_hashtable->table[i])
+            prev = i==hash?temp:NULL, temp = i==hash?temp->next:_hashtable->table[i])
         {
-            _hashtable->table[i]=temp->next;
-            hash=hashtable_hash(_hashtable->get_key(temp), _hashtable->seed, new_size_exponent);
-            temp->next = _hashtable->table[hash];
-            _hashtable->table[hash] = temp;
+            hash=hashtable_hash(_hashtable->get_key(temp->data), _hashtable->seed, new_size_exponent);
+            if(hash!=i){
+                if(prev)prev->next = temp->next;
+                else _hashtable->table[i]=temp->next;
+
+                temp->next = _hashtable->table[hash];
+                _hashtable->table[hash]=temp;
+            }
         }
     }
 }
@@ -150,9 +170,7 @@ static void hashtable_Expand(_hashtable)
 struct hashtable_chaining * _hashtable;
 {
     struct hashtable_bucket_chaining **safe;
-    
     _hashtable->bucket_size_exponent++;
-    _hashtable->seed = (hash_type)rand(); /* Optional */
     if((safe =
         (struct hashtable_bucket_chaining**)hashtable_realloc_zero(_hashtable->table,sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent-1)),
                                                                    sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent)))== NULL) hashtable_insufficient_memory_error();
@@ -166,7 +184,6 @@ static void hashtable_Collapse(_hashtable)
     struct hashtable_bucket_chaining **safe;
     
     _hashtable->bucket_size_exponent--;
-    _hashtable->seed = (hash_type)rand(); /* Optional */
     hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent+1, _hashtable->bucket_size_exponent);
     if((safe =
         (struct hashtable_bucket_chaining**)hashtable_realloc_zero
@@ -176,7 +193,6 @@ static void hashtable_Collapse(_hashtable)
         )== NULL) hashtable_insufficient_memory_error();
     _hashtable->table = safe;
 }
-
 void hashtable_Insert(_hashtable, data)
     struct hashtable_chaining * _hashtable;
     void * data;
@@ -186,6 +202,7 @@ void hashtable_Insert(_hashtable, data)
     hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_size_exponent);
     _hashtable->table[hash] = hashtable_new_bucket_chaining(data, _hashtable->table[hash]);
     _hashtable->items++;
+    //printf("%d\n",hash);
 }
 
 void * hashtable_Query(_hashtable, data, compar)
