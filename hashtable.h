@@ -18,8 +18,6 @@
 #ifndef HASHTABLE_H
 #define HASHTABLE_H
 
-
-
 #define hashtable_MAX_LOAD_FACTOR 1
 
 #define hashtable_insufficient_memory_error()   \
@@ -170,29 +168,35 @@ static void hashtable_Expand(_hashtable)
 struct hashtable_chaining * _hashtable;
 {
     struct hashtable_bucket_chaining **safe;
+    
     _hashtable->bucket_size_exponent++;
     if((safe =
-        (struct hashtable_bucket_chaining**)hashtable_realloc_zero(_hashtable->table,sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent-1)),
-                                                                   sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent)))== NULL) hashtable_insufficient_memory_error();
+        (struct hashtable_bucket_chaining**)hashtable_realloc_zero
+        (_hashtable->table,
+         sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent-1)),
+        sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent))
+        )== NULL) hashtable_insufficient_memory_error();
+        
     _hashtable->table = safe;
     hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent-1, _hashtable->bucket_size_exponent);
 }
 
-//static void hashtable_Collapse(_hashtable)
-//    struct hashtable_chaining * _hashtable;
-//{
-//    struct hashtable_bucket_chaining **safe;
-//    
-//    _hashtable->bucket_size_exponent--;
-//    hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent+1, _hashtable->bucket_size_exponent);
-//    if((safe =
-//        (struct hashtable_bucket_chaining**)hashtable_realloc_zero
-//        (_hashtable->table,
-//         sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent+1)),
-//         sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent))
-//        )== NULL) hashtable_insufficient_memory_error();
-//    _hashtable->table = safe;
-//}
+static void hashtable_Collapse(_hashtable)
+    struct hashtable_chaining * _hashtable;
+{
+    struct hashtable_bucket_chaining **safe;
+    
+    _hashtable->bucket_size_exponent--;
+    hashtable_Rehash(_hashtable, _hashtable->bucket_size_exponent+1, _hashtable->bucket_size_exponent);
+    if((safe =
+        (struct hashtable_bucket_chaining**)hashtable_realloc_zero
+        (_hashtable->table,
+         sizeof(struct hashtable_bucket_chaining*) * (1<<(_hashtable->bucket_size_exponent+1)),
+         sizeof(struct hashtable_bucket_chaining*)*(1<<_hashtable->bucket_size_exponent))
+        )== NULL) hashtable_insufficient_memory_error();
+        
+    _hashtable->table = safe;
+}
 void hashtable_Insert(_hashtable, data)
     struct hashtable_chaining * _hashtable;
     void * data;
@@ -236,10 +240,12 @@ void hashtable_Delete(_hashtable, data, compar, destroy)
     if (temp){
         if (prev) prev->next = temp->next;
         else _hashtable->table[hash] = temp->next;
-                
+            
         destroy(temp->data);
         free(temp);
     }
+    if( _hashtable->items/(1<<_hashtable->bucket_size_exponent)<= hashtable_MAX_LOAD_FACTOR/4)
+        hashtable_Collapse(_hashtable);
 }
 
 static double hashtable_Get_Occupied_Ratio(_hashtable)
