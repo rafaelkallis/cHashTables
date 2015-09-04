@@ -204,21 +204,21 @@ void hashtable_Insert(_hashtable, data)
     _hashtable->items++;
 }
 
-//void * hashtable_Query(_hashtable, data, compar)
-//    struct hashtable_chaining * _hashtable;
-//    void * data;
-//    int (*compar)(void*,void*);
-//{
-//    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_size_exponent);
-//    struct hashtable_bucket_chaining * iterator = _hashtable->table[hash];
-//    
-//    while(iterator){
-//        if(compar(iterator->data, data) == 0 ) return iterator;
-//        else iterator = iterator->next;
-//    }
-//    
-//    return NULL;
-//}
+void * hashtable_Query(_hashtable, data, compar)
+    struct hashtable_chaining * _hashtable;
+    void * data;
+    int (*compar)(const void*, const void*);
+{
+    hash_type hash = hashtable_hash(_hashtable->get_key(data),_hashtable->seed,_hashtable->bucket_size_exponent);
+    struct hashtable_bucket_chaining * temp = _hashtable->table[hash];
+    
+    while(temp){
+        if(compar(temp->data, data) == 0 ) return temp->data;
+        else temp = temp->next;
+    }
+    
+    return NULL;
+}
 
 //void hashtable_Delete(_hashtable, data, compar, destroy)
 //    struct hashtable_chaining * _hashtable;
