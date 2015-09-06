@@ -28,8 +28,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <time.h>
-#include "pcg_basic.c"
-
+#include "pcg_basic.h"
 /* Specify your parameters here */
 
 
@@ -38,30 +37,17 @@
 
 /* Modify at your own risk */
 
-    // uint8_t  : 256                           Max Buckets
-    // uint16_t : 65'536                        Max Buckets
-    // uint32_t : 4'294'967'296                 Max Buckets
-    // uint64_t : 18'446'744'073'709'551'616    Max Buckets
-    typedef uint8_t hash_type;
+    typedef uint64_t hash_type;
 
-    #define hashtable_HASH_BITS     (sizeof(hash_type)*8)
+    #define WORD_SIZE                           (64)
 
-    #define hashtable_MAX_HASH      (hashtable_HASH_BITS==64? 0xFFFFFFFFFFFFFFFF : (hashtable_HASH_BITS==32? 0xFFFFFFFF : (hashtable_HASH_BITS==16? 0xFFFF : 0xFF)))
+    #define hashtable_MAX_HASH                  (0xFFFFFFFFFFFFFFFF)
 
-    #define hashtable_RAND_64       ((((uint64_t)pcg32_random() <<  0) & 0x00000000FFFFFFFFull) |   \
-                                     (((uint64_t)pcg32_random() << 32) & 0xFFFFFFFF00000000ull))
+    #define hashtable_RANDOM                    (pcg64_random())
 
-    #define hashtable_RAND_32       ((uint32_t)pcg32_random())
-
-    #define hashtable_RAND_16       ((uint16_t)pcg32_boundedrand(0xFFFF))
-
-    #define hashtable_RAND_8        ((uint8_t)pcg32_boundedrand(0xFF))
-
-    #define hashtable_RANDOM        (hashtable_HASH_BITS==64? hashtable_RAND_64 : (hashtable_HASH_BITS==32? hashtable_RAND_32 : (hashtable_HASH_BITS==16? hashtable_RAND_16 : hashtable_RAND_8)))
+    #define hashtable_RANDOM_BOUNDED(bound)     (pcg64_random_bounded(bound))
 
     static bool nondeterministic_seed = false;
-
-    static int rounds = 5;
 
 /*                                  */
 
@@ -113,12 +99,12 @@ static inline struct hashtable_bucket_chaining * hashtable_new_bucket_chaining(d
     return new_bucket_chaining;
 }
 
-static inline hash_type hashtable_hash(key, seed, cap_order)
+static inline hash_type hashtable_hash(key, seed, cap_exponent)
     void * key;
     hash_type seed;
-    uint8_t cap_order;
+    uint8_t cap_exponent;
 {
-    return (hash_type)(seed * *(hash_type*)key) >> (hashtable_HASH_BITS - cap_order);
+    return (hash_type)(seed * *(hash_type*)key) >> (WORD_SIZE - cap_exponent);
 }
 
 static void hashtable_Rehash(_hashtable, old_size_exponent, new_size_exponent)
@@ -233,7 +219,7 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
 void * (*get_key)(void*);
 hash_type init_size;
 {
-    if(!nondeterministic_seed) pcg32_srandom(time(NULL) ^ (intptr_t)&printf, (intptr_t)&rounds), nondeterministic_seed = true;
+    if(!nondeterministic_seed) pcg64_srandom(), nondeterministic_seed = true;
         
     struct hashtable_chaining * new_hashtable;
     
@@ -304,14 +290,14 @@ void hashtable_Delete(_hashtable, data, compar, destroy)
 void hashtable_Stats(_hashtable)
     struct hashtable_chaining * _hashtable;
 {
-    hash_type nBuckets = 1<<_hashtable->bucket_size_exponent;
+    double nBuckets = 1<<_hashtable->bucket_size_exponent;
     double occupiedR = hashtable_Get_Occupied_Ratio(_hashtable);
     printf(" * Hashtable Statistics *\n");
     printf("——————————————————————————\n");
-    printf("Seed         = %llu \n",_hashtable->seed);
-    printf("#Items       = %llu \n",_hashtable->items);
-    printf("#Buckets     = %llu \n",nBuckets);
-    printf("BiggestChain = %llu \n",hashtable_Get_Biggest_Chain(_hashtable));
+    printf("Seed         = %llu \n",(uint64_t)_hashtable->seed);
+    printf("#Items       = %llu \n",(uint64_t)_hashtable->items);
+    printf("#Buckets     = %llu \n",(uint64_t)nBuckets);
+    printf("BiggestChain = %llu \n",(uint64_t)hashtable_Get_Biggest_Chain(_hashtable));
     printf("%%Occupied    = %0.2f%% \n",100*occupiedR);
     printf("%%Empty       = %0.2f%% ",100*(1-occupiedR));
     printf("(Expected: %0.2f%%, Diff = %+0.2f%%)\n",
