@@ -25,8 +25,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <math.h>
 #include <time.h>
+#include "pcg_basic.c"
 
 /* Specify your parameters here */
 
@@ -34,51 +36,41 @@
     // Recommended load factor: 1
     #define hashtable_MAX_LOAD_FACTOR   1
 
+/* Modify at your own risk */
+
     // uint8_t  : 256                           Max Buckets
     // uint16_t : 65'536                        Max Buckets
     // uint32_t : 4'294'967'296                 Max Buckets
     // uint64_t : 18'446'744'073'709'551'616    Max Buckets
-
-/* Modify at your own risk */
+    typedef uint8_t hash_type;
 
     #define hashtable_HASH_BITS     (sizeof(hash_type)*8)
 
-/* Portable Solution with poor randomness */
+    #define hashtable_MAX_HASH      (hashtable_HASH_BITS==64? 0xFFFFFFFFFFFFFFFF : (hashtable_HASH_BITS==32? 0xFFFFFFFF : (hashtable_HASH_BITS==16? 0xFFFF : 0xFF)))
 
-    #define hashtable_RAND_64       ((((uint64_t) rand() <<  0) & 0x000000000000FFFFull) |  \
-                                     (((uint64_t) rand() << 16) & 0x00000000FFFF0000ull) |  \
-                                     (((uint64_t) rand() << 32) & 0x0000FFFF00000000ull) |  \
-                                     (((uint64_t) rand() << 48) & 0xFFFF000000000000ull))
+    #define hashtable_RAND_64       ((((uint64_t)pcg32_random() <<  0) & 0x00000000FFFFFFFFull) |   \
+                                     (((uint64_t)pcg32_random() << 32) & 0xFFFFFFFF00000000ull))
 
-    #define hashtable_RAND_32       ((((uint32_t) rand() <<  0) & 0x000000000000FFFFull) |  \
-                                     (((uint32_t) rand() << 16) & 0x00000000FFFF0000ull))
+    #define hashtable_RAND_32       ((uint32_t)pcg32_random())
 
-    #define hashtable_RAND_16         (((uint16_t) rand() << 0) & 0x000000000000FFFFull)
+    #define hashtable_RAND_16       ((uint16_t)pcg32_boundedrand(0xFFFF))
 
-    #define hashtable_RAND_8           (((uint8_t) rand() >> 8) & 0x00000000000000FFull)
+    #define hashtable_RAND_8        ((uint8_t)pcg32_boundedrand(0xFF))
 
-    /* Compatible with BSD Based Systems */
+    #define hashtable_RANDOM        (hashtable_HASH_BITS==64? hashtable_RAND_64 : (hashtable_HASH_BITS==32? hashtable_RAND_32 : (hashtable_HASH_BITS==16? hashtable_RAND_16 : hashtable_RAND_8)))
 
-//    #define hashtable_RAND_64       ((((uint64_t) arc4random() <<  0) & 0x00000000FFFFFFFFull) |   \
-//                                     (((uint64_t) arc4random() << 32) & 0xFFFFFFFF00000000ull))
-//
-//    #define hashtable_RAND_32       arc4random()
-//
-//    #define hashtable_RAND_16       (arc4random() >> 16)
-//
-//    #define hashtable_RAND_8        (arc4random() >> 24)
+    static bool nondeterministic_seed = false;
 
-   #define hashtable_RANDOM        (hashtable_HASH_BITS==64? hashtable_RAND_64 : (hashtable_HASH_BITS==32? hashtable_RAND_32 : (hashtable_HASH_BITS==16? hashtable_RAND_16 : hashtable_RAND_8)))
+    static int rounds = 5;
 
 /*                                  */
 
-static uint8_t srand_check = 0;
 
 struct hashtable_bucket_chaining{
     void * data;
     struct hashtable_bucket_chaining * next;
 };
-unsigned __int128 rafael;
+
 struct hashtable_chaining{
     hash_type items,seed;
     uint8_t bucket_size_exponent;
@@ -206,21 +198,27 @@ struct hashtable_chaining * _hashtable;
 static double hashtable_Get_Occupied_Ratio(_hashtable)
 struct hashtable_chaining * _hashtable;
 {
-    hash_type occupied,i;
-    for(occupied = 0, i = 0; i < 1<<_hashtable->bucket_size_exponent; i++)
+    hash_type i;
+    uint32_t occupied;
+    for(occupied = 0, i = 0; i < 1<<_hashtable->bucket_size_exponent; i++){
         if(_hashtable->table[i]) occupied++;
+        if(i==hashtable_MAX_HASH)break;
+    }
     return (double)occupied/(1<<_hashtable->bucket_size_exponent);
 }
 
 static hash_type hashtable_Get_Biggest_Chain(_hashtable)
 struct hashtable_chaining * _hashtable;
 {
-    hash_type max_global,max_chain,i;
+    hash_type i;
+    uint32_t max_global,max_chain;
     struct hashtable_bucket_chaining * temp;
     for(i = 0, max_global=0; i < 1<<_hashtable->bucket_size_exponent; i++){
-        for(temp = _hashtable->table[i], max_chain=0; temp; temp=temp->next)
+        for(temp = _hashtable->table[i], max_chain=0; temp; temp=temp->next){
             max_chain++;
+        }
         max_global = max_chain > max_global ? max_chain : max_global;
+        if(i==hashtable_MAX_HASH)break;
     }
     return max_global;
 }
@@ -235,7 +233,7 @@ struct hashtable_chaining * hashtable_Init(get_key, init_size)
 void * (*get_key)(void*);
 hash_type init_size;
 {
-    if(!srand_check)srand(time(0)),srand_check = (uint8_t) rand();
+    if(!nondeterministic_seed) pcg32_srandom(time(NULL) ^ (intptr_t)&printf, (intptr_t)&rounds), nondeterministic_seed = true;
         
     struct hashtable_chaining * new_hashtable;
     
@@ -276,7 +274,6 @@ void * hashtable_Query(_hashtable, data, compar)
         if(compar(temp->data, data) == 0 ) return temp->data;
         else temp = temp->next;
     }
-    
     return NULL;
 }
 
@@ -307,14 +304,14 @@ void hashtable_Delete(_hashtable, data, compar, destroy)
 void hashtable_Stats(_hashtable)
     struct hashtable_chaining * _hashtable;
 {
-    double nBuckets = 1<<_hashtable->bucket_size_exponent;
+    hash_type nBuckets = 1<<_hashtable->bucket_size_exponent;
     double occupiedR = hashtable_Get_Occupied_Ratio(_hashtable);
     printf(" * Hashtable Statistics *\n");
     printf("——————————————————————————\n");
-    printf("Seed         = %llu \n",(uint64_t)_hashtable->seed);
-    printf("#Items       = %llu \n",(uint64_t)_hashtable->items);
-    printf("#Buckets     = %llu \n",(uint64_t)nBuckets);
-    printf("BiggestChain = %llu \n",(uint64_t)hashtable_Get_Biggest_Chain(_hashtable));
+    printf("Seed         = %llu \n",_hashtable->seed);
+    printf("#Items       = %llu \n",_hashtable->items);
+    printf("#Buckets     = %llu \n",nBuckets);
+    printf("BiggestChain = %llu \n",hashtable_Get_Biggest_Chain(_hashtable));
     printf("%%Occupied    = %0.2f%% \n",100*occupiedR);
     printf("%%Empty       = %0.2f%% ",100*(1-occupiedR));
     printf("(Expected: %0.2f%%, Diff = %+0.2f%%)\n",
@@ -335,10 +332,11 @@ struct hashtable_chaining * _hashtable;
     printf("———————————————————————");
 
     for(i=0;i<1<<_hashtable->bucket_size_exponent;i++){
-        printf("\n%llu:",(uint64_t)i);
+        printf("\n%llu:",i);
         for(temp=_hashtable->table[i];temp;temp=temp->next){
-            printf("->(%d)",*(int*)_hashtable->get_key(temp->data));
+            printf("->(%llu)",*(long long*)_hashtable->get_key(temp->data));
         }
+        if(i==hashtable_MAX_HASH)break;
     }
     printf("\n———————————————————————\n");
 }
