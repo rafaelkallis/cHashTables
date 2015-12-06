@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "equalfunc.h"
+#include "../include/equalfunc.h"
 
 bool equal_char(void * data1, void * data2){
     return *(char*)data1 == *(char*)data2;

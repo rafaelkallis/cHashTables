@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "hashfunc.h"
+#include "../include/hashfunc.h"
 
 hash_type hash_int8_t(void * _int8_t){
     return *(int8_t*)_int8_t;

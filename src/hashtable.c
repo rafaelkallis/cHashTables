@@ -13,7 +13,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#include "hashtable.h"
+#include "../include/hashtable.h"
 
 static inline struct hashtable_bucket * hashtable_new_bucket(void * data,
                                                              struct hashtable_bucket * next){
